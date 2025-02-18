@@ -9,13 +9,6 @@ output: cereal_filtered_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## GitHub Documents
-
-This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
-
-## Including Code
-
-You can include R code in the document as follows:
 
 ```{r cars}
 
@@ -30,9 +23,8 @@ if (!requireNamespace("pacman", quietly = TRUE)) {
 pacman::p_load(
   fixest, haven, modelsummary, tidyverse, readxl, dplyr, plm, stargazer, IDPmisc, lfe, here, sandwich, AER, 
   dynlm, forecast, scales, quantmod, urca, nlme, lmtest, pdynmc, dynpanel, rstudioapi, pgmm, xtable, estimatr, 
-  zoo, skimr, lubridate, patchwork
+  zoo, skimr, lubridate, patchwork, tidyr, data.table, ggplot2, car, here, tibble
 )
-
 
 # Get the directory path of the current R Markdown file
 current_rmd <- rstudioapi::getSourceEditorContext()$path
@@ -40,29 +32,50 @@ current_rmd <- rstudioapi::getSourceEditorContext()$path
 # Set the working directory to the location of the R Markdown file
 setwd(dirname(current_rmd))
 
-
-cereal <- read.csv(file.path(getwd(), "products.csv"), sep = ",")
-# cement$date <- lubridate::as_date(cement$date)
-
+data <- read.csv(file.path(getwd(), "products.csv"), sep = ",")
 ```
 
 # 1. A first look at the data. 
 
 ```{r pressure, echo=FALSE}
 
-print(head(cereal))
+print(head(data))
 
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-vtv
-vtvtv
-vtvtv
+Summary statistic
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+data <- rownames_to_column(data, var = "Index")
+datasummary_skim(data, fmt = 4)
+```
+
+First plots
+```{r}
+
+# Filtering the data
+mushy <- data %>% filter(mushy == 1)
+firm <- data %>% filter(mushy == 0)
+
+# Base R plot: Consumption vs. Price (original)
+par(mfrow = c(1, 2))  # Arrange 2 plots side by side
+par(mgp = c(2, 1, 0)) 
+
+# Plot 1: Original plot
+plot(data$price_per_serving,data$servings_sold, xlab =  "Price per Serving",
+     ylab =  "Servings Sold", col = "blue", pch = 16)
+title("Consumption and Price of Cereals (Unaggregated)", line= 0.3)
+
+# Plot 2: Mushy vs Firm in the same plot using ggplot2
+ggplot(data, aes(x = price_per_serving, y = servings_sold, color = factor(mushy))) +
+  geom_point() +
+  labs(title = "Mushy vs Firm Cereals: Price vs Servings Sold",
+       x = "Price per Serving",
+       y = "Servings Sold",
+       color = "Cereal Type") +
+  scale_color_manual(values = c("blue", "red"), labels = c("Firm", "Mushy")) +
+  theme_minimal()
+
 ```
