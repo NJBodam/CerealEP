@@ -45,11 +45,23 @@ print(head(data))
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-Summary statistic
+Q1. Summary statistic
 
 ```{r}
 data <- rownames_to_column(data, var = "Index")
 datasummary_skim(data, fmt = 4)
+```
+Q1. Summary stats II
+
+```{r}
+cereal_data <- data
+cereal_data$market <- as.factor(cereal_data$market)
+cereal_data$product <- as.factor(cereal_data$product)
+cereal_data$mushy <- as.factor(cereal_data$mushy)
+
+summary(cereal_data)
+
+
 ```
 
 First plots
