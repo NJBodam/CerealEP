@@ -45,7 +45,8 @@ print(head(data))
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-Q1. Summary statistic
+Q1. Describe the data
+Using products.csv, compute summary statistics for different the different variables
 
 ```{r}
 data <- rownames_to_column(data, var = "Index")
@@ -61,8 +62,360 @@ cereal_data$mushy <- as.factor(cereal_data$mushy)
 
 summary(cereal_data)
 
+```
+
+Q2 Compute market shares
+
+To transform observed quantities qjt into market shares sjt = qjt/Mt, we first need to define a
+market size Mt. We’ll assume that the potential number of servings sold in a market is the city’s
+total population multiplied by 90 days in the quarter. Create a new variable market_size equal to
+city_population times 90. Note that this assumption is somewhat reasonable but also somewhat
+arbitrary.
+Next, compute a new column market_share equal to servings_sold divided by market_size.
+This gives our market shares sjt. We’ll also need the outside share s0t = 1 − Pj∈Jt sjt. Create a
+new column outside_share equal to this expression.
+
+```{r}
+
+# market_size
+cereal_data$market_size <- cereal_data$city_population * 90
+
+# market_share
+cereal_data$market_share <- cereal_data$servings_sold / cereal_data$market_size
+
+# outside_share
+cereal_data <- cereal_data %>%
+  group_by(market) %>%
+  mutate(outside_share = 1 - sum(market_share)) %>%
+  ungroup()
+
+# Stats of new vars
+summary(cereal_data$market_size)
+summary(cereal_data$market_share)
+summary(cereal_data$outside_share)
+```
+Q3. Estimate the pure logit model with OLS
+Recall the pure logit estimating equation: log(sjt/s0t) = δjt = αpjt+x′
+jtβ +ξjt. First, create a new
+column logit_delta equal to the left-hand side of this expression.
+Then, run an OLS regression of logit_delta on a constant, mushy, and price_per_serving.
+(a) Interpret your estimates.
+(b) How can you re-express your estimate on mushy in terms of how much consumers are willing
+to pay for mushy, using your estimated price coefficient?
+(c) Discuss which type of standard errors you should use. Compare their estimates.
+
+```{r}
+
+# logit_delta
+cereal_data$logit_delta <- log(cereal_data$market_share / cereal_data$outside_share)
+
+# OLS regression
+logit_model <- lm(logit_delta ~  mushy + price_per_serving, data = cereal_data)
+
+# Print the summary of the regression
+summary(logit_model)
+```
+(a) Interpret your estimates.
+Our model is in the form:
+- logit_delta = β₀ + β₁*mushy + β₂*price_per_serving + ε
+The intercept is negative (-2.93450 ) which shows that for non-mushy cereals with zero price, consumers will 
+prefer the outside good. There are likely unobserved characteristics explaining this. The mushy coefficient (0.07476)
+implies that a cereal being mushy increases the log-odds of it being chosen over the outside option by appx.
+0.075. However it is not statistically significant given the p-value (0.16).
+
+The price_per_serving coefficient aligns with the basic law of demand. A one unit increase in price_per_serving
+reduces the log-odds of choosing that cereal by 7.49, all things being equal. This is highly significant.
+
+Only 3.42% (R-Squared) of the variation in logit_delta is explained by the model. This is small. mushy and price_per_serving alone are not strong factors influencing the demand for cereal.  
+
+(b) How can you re-express your estimate on mushy in terms of how much consumers are willing
+to pay for mushy, using your estimated price coefficient?
+- WTP for mushy can be estimated by dividing the mushy coefficient by the price coefficient
+WTP_mushy =  0.07476 / 7.48014 = 0.01. 
+# Consumers are willing to pay $0.01 per serving for mushy cereal over non mushy cereal. But mushy not signiifcant
+
+(c) Discuss which type of standard errors you should use. Compare their estimates.
+
+- Clustered robust standard errors are preferred given that we have observations that are nested within markets. There could be unobserved factors that account for cereal demand within markets.
+For the intercept, mushy1 and price_per_serving, the Cluster_Robust_SE is noticeably smaller in all cases. However the p-value for mushy improved, getting closer to the 10% significance level but still not statistically significant.
+
+# Kindly Review this section
+
+
+```{r}
+
+# Default OLS Standard Errors (Assumes Homoscedasticity)
+summary(logit_model)
+summary_model <- summary(logit_model)
+default_se <- summary_model$coefficients[, "Std. Error"]
+coefficients <- summary_model$coefficients[, "Estimate"] # Extract coefficients as well
+
+# Cluster-Robust Standard Errors (clustering by 'market')
+cluster_vcov <- vcovCL(logit_model, cluster = ~ market) # Cluster by 'market' variable
+cluster_se <- sqrt(diag(cluster_vcov))
+coeftest(logit_model, vcov = cluster_vcov)
+
+# Heteroscedasticity-Robust Standard Errors (HC3 as an example)
+robust_vcov_hc3 <- vcovHC(logit_model, type = "HC3")
+robust_se_hc3 <- sqrt(diag(robust_vcov_hc3))
+# coeftest provides coefficient table with robust SEs and p-values
+coeftest(logit_model, vcov = robust_vcov_hc3)
+
+# Table
+se_comparison_table <- data.frame(
+  Variable = rownames(summary_model$coefficients),
+  Coefficient = coefficients,
+  Default_SE = default_se,
+#  HC3_Robust_SE = robust_se_hc3,
+  Cluster_Robust_SE = cluster_se
+)
+
+print(se_comparison_table, row.names = FALSE, digits = 5)
+
 
 ```
+
+4. Add market and product fixed effects
+Since we expect price pjt to be correlated with unobserved product quality ξjt, we should be
+worried that our estimated ˆα on price is biased. Since we have multiple observations per market
+and product, and prices vary both across and within markets, it is feasible for us to add both
+market and product fixed-effects.
+If ξjt = ξj +ξt +Δξjt and most of the correlation between pjt and ξjt is due to correlation between
+pjt and either ξj (product fixed effects) or ξt (market fixed effects), then explicitly accounting for
+these fixed effects during estimation should help reduce the bias of our ˆα.
+Estimate a specification incorporating these fixed-effects and report a table comparing it with the
+specification without fixed-effects. Interpret any changes.
+
+Ans:
+The intercept becomes positive after adding fixed effects. The market and product fixed effects indeed capture significant variation that was previously absorbed into the intercept and error term in the no-fixed-effects model. The cluster-robust standard error for the intercept increases from 0.1071 to 0.1578. 
+
+mushy1 changes from 0.0748 in the no-FE model to -2.0889 in the FE model. The sign flips with larger absolute value that is highly statistically significant. All things being equal, consumers strongly dislike cereals that become mushy in milk. This makes sense. Mushy makes up appx 1/3 of the cereal market. The mean price_per_serving for mushy cereals is lower than for non-mushy (implies mushy cereals are cheaper). and the mean servings_sold for mushy is higher than non-mushy cereal (higher demand). 
+The significant change in the mushy coefficient suggests strong omitted variable bias in the model without FE. The "mushy" characteristic was likely correlated with some omitted market or product-specific factors that were biasing the coefficient upwards (making it appear positive when the true within-market and within-product effect is negative).
+
+#Perhaps mushy cereals were disproportionately sold in markets with systematically higher demand for cereals overall, or mushy cereals tended to be certain types of products that had other appealing characteristics not controlled for.
+
+price_per_serving becomes much more negative, changing from -7.4801 to -28.6179. Substantially larger magnitude in the fixed effects model.The cluster-robust standard error also increases in FE. Price elasticity of demand for cereals is estimated to be considerably more elastic. Consumers are much more sensitive to price changes within the same market and for the same product in the FE model than the non-FE model.
+
+Model with FE is much more credible as it explains over 50% of the variation in the demand for cereal compared to the 3% of the non FE model. Controlling for unobserved heterogeneity significantly improved our model
+
+
+```{r}
+
+# OLS regression with market and product fixed effects:
+logit_model_fe <- lm(logit_delta ~ price_per_serving + mushy + factor(market) + factor(product), data = cereal_data)
+
+summary(logit_model_fe)
+
+common_variables <- c("(Intercept)", "mushy1", "price_per_serving")
+
+# Model WITHOUT FE
+coef_no_fe <- coef(logit_model)[common_variables]
+cluster_vcov <- vcovCL(logit_model, cluster = ~ market)
+cluster_se <- sqrt(diag(cluster_vcov))[common_variables]
+
+# Model WITH FE
+coef_fe <- coef(logit_model_fe)[common_variables]
+cluster_vcov_fe <- vcovCL(logit_model_fe, cluster = ~ market)
+cluster_se_fe <- sqrt(diag(cluster_vcov_fe))[common_variables] 
+
+
+# Comparison table
+model_comparison_table <- data.frame(
+  Coefficient_No_FE = coef_no_fe,
+  Cluster_Robust_SE_No_FE = cluster_se,
+  Coefficient_FE = coef_fe,
+  Cluster_Robust_SE_FE = cluster_se_fe
+)
+
+print(model_comparison_table, row.names = FALSE, digits = 5)
+
+```
+
+# Detour showing mushy summary stats.
+
+```{r}
+
+# Assuming your data frame is named cereal_data and you have run the summary(cereal_data) already
+
+# Convert 'mushy' to numeric for calculating mean if it's still a factor (although summary() would give frequencies if it's a factor)
+cereal_data$mushy_numeric <- as.numeric(as.character(cereal_data$mushy))
+
+# Calculate summary statistics by mushy vs. non-mushy
+
+mushy_summary <- cereal_data %>%
+  group_by(mushy) %>%
+  summarize(
+    # For mushy (categorical): Frequency counts
+    count = n(),
+
+    # For servings_sold (numeric): Mean, Min, Max
+    servings_sold_mean = mean(servings_sold, na.rm = TRUE),
+    servings_sold_min = min(servings_sold, na.rm = TRUE),
+    servings_sold_max = max(servings_sold, na.rm = TRUE),
+
+    # For city_population (numeric): Mean, Min, Max (though city_population might be constant in your sample data)
+    city_population_mean = mean(city_population, na.rm = TRUE),
+    city_population_min = min(city_population, na.rm = TRUE),
+    city_population_max = max(city_population, na.rm = TRUE),
+
+    # For price_per_serving (numeric): Mean, Min, Max
+    price_per_serving_mean = mean(price_per_serving, na.rm = TRUE),
+    price_per_serving_min = min(price_per_serving, na.rm = TRUE),
+    price_per_serving_max = max(price_per_serving, na.rm = TRUE),
+
+    # For price_instrument (numeric): Mean, Min, Max
+    price_instrument_mean = mean(price_instrument, na.rm = TRUE),
+    price_instrument_min = min(price_instrument, na.rm = TRUE),
+    price_instrument_max = max(price_instrument, na.rm = TRUE)
+  )
+
+# Print the summary table
+print(mushy_summary)
+
+
+```
+
+# Detour exploring firm effect. Kindly ignore
+
+```{r}
+
+cereal_data$firm_id <- substr(cereal_data$product, 1, 2)
+cereal_data$firm_id <- as.factor(cereal_data$firm_id)
+
+cereal_data$market_id <- substr(cereal_data$market, 1, 3)
+cereal_data$market_id <- as.factor(cereal_data$market_id)
+
+cereal_data$mkt_quar_id <- stringr::str_sub(cereal_data$market, start = -2) # Negative start index counts from the end
+cereal_data$mkt_quar_id <- as.factor(cereal_data$mkt_quar_id)
+
+
+logit_model_firm_last3_fe <- lm(logit_delta ~ price_per_serving + mushy +  factor(market) + factor(product)+ factor(mkt_quar_id) + factor(market_id) + factor(firm_id), data = cereal_data)
+
+summary(logit_model_firm_last3_fe)
+
+````
+
+5. Add an instrument for price
+Adding market and product fixed effects can be helpful, but since unobserved quality typically
+varies by both product and market, we really want to instrument for prices. The data comes with
+a column price_instrument that we should interpret as a valid instrument for price that satisfies
+the needed exclusion restriction. It could be a cost-shifter, a valid Hausman instrument, or similar.
+
+(a) Run a first-stage regression to make sure that it’s a relevant instrument for price. Does
+price_instrument seem like a relevant instrument for prices?
+
+Ans:
+Coefficient on price_instrument is highly Significant, further portrayed by the large t-value (151.181) and very small p-value (< 2e-16). The price_instrument is strongly correlated with price_per_serving in the first-stage regression.
+The coefficient is positive (0.8771), showing that it is indeed a cost-shifter which in the economic sense should be positively correlated with price. A very high R-squared of over 96% shows that our first-stage model explains a large portion of the variation in price_per_serving.
+
+(b) Run your IV regression using price_instrument as an instrument for price_per_serving.
+How does your estimate of ˆα change?
+
+Ans:
+#  Larger cluster-robust standard errors, compared to the homoscedastic ones, indicate that accounting for within-market correlation does impact the precision of estimates.
+OLS (FE Model) Coefficient for price_per_serving:  -28.61787 
+IV (2SLS) Coefficient for price_per_serving:  -30.59952
+
+The fact that the IV coefficient is more negative than the OLS coefficient suggests that the OLS estimate of the price effect might have been biased towards zero (less negative) due to endogeneity. This is indicative of positive endogeneity bias in the OLS model. IV estimation improved the estimate by reducing the bias, leading to a more negative and (hopefully) less biased estimate of the true price effect. IV shows demand for cereal is more elastic as shown in OLS.
+
+
+
+
+```{r}
+
+# First-Stage Regression for Instrument Relevance 
+
+# First-stage regression: IV
+first_stage_model <- lm(price_per_serving ~ price_instrument + mushy + factor(market) + factor(product), data = cereal_data)
+
+# Summarize the first-stage regression
+summary(first_stage_model)
+
+# Extract and print the coefficient and t-statistic for price_instrument
+first_stage_summary <- summary(first_stage_model)
+price_instrument_coef <- first_stage_summary$coefficients["price_instrument", "Estimate"]
+price_instrument_t_value <- first_stage_summary$coefficients["price_instrument", "t value"]
+price_instrument_p_value <- first_stage_summary$coefficients["price_instrument", "Pr(>|t|)"]
+
+cat("First-Stage Regression - Relevance of price_instrument:\n")
+cat("Coefficient for price_instrument: ", price_instrument_coef, "\n")
+cat("t-value for price_instrument: ", price_instrument_t_value, "\n")
+cat("p-value for price_instrument: ", price_instrument_p_value, "\n\n")
+
+# IV Regression (Second Stage)
+
+# IV Regression using ivreg(), instrumenting price_per_serving with price_instrument
+iv_model <- ivreg(logit_delta ~ price_per_serving + mushy + factor(market) + factor(product) |
+                    price_instrument + mushy + factor(market) + factor(product),
+                  data = cereal_data)
+
+# Summarize the IV regression + Homoscedastic SE 
+summary(iv_model)
+
+# Summarize the IV regression + Cluster Robust SE
+iv_summary <- coeftest(iv_model, vcov = vcovCL(iv_model, cluster = ~ market)) 
+print(iv_summary)
+
+
+iv_intercept <- iv_summary["(Intercept)", "Estimate"]
+iv_intercept_se <- iv_summary["(Intercept)", "Std. Error"]
+iv_price_coef <- iv_summary["price_per_serving", "Estimate"]
+iv_price_se <- iv_summary["price_per_serving", "Std. Error"]
+
+cat("IV Regression Results (Cluster-Robust Standard Errors):\n")
+cat("IV Coefficient for price_per_serving: ", iv_price_coef, "\n")
+cat("Cluster-Robust Standard Error for price_per_serving: ", iv_price_se, "\n")
+
+# Compare IV estimate with OLS estimate (from FE model)
+# (Assuming you have already run and stored the FE model results in 'logit_model_fe' and 'coeftest_fe')
+cluster_vcov_fe <- vcovCL(logit_model_fe, cluster = ~ market)
+coeftest_fe <- coeftest(logit_model_fe, vcov = cluster_vcov_fe)
+
+ols_fe_intercept <- ols_fe_summary["(Intercept)", "Estimate"]
+ols_fe_intercept_se <- ols_fe_summary["(Intercept)", "Std. Error"]
+ols_fe_summary <- coeftest_fe # coeftest_fe contains cluster-robust SEs for FE model from previous steps
+ols_fe_price_coef <- ols_fe_summary["price_per_serving", "Estimate"]
+ols_fe_price_se <- ols_fe_summary["price_per_serving", "Std. Error"]
+
+cat("\nComparison of Price Coefficients:\n")
+cat("OLS (FE Model) Coefficient for price_per_serving: ", ols_fe_price_coef, "\n")
+cat("OLS (FE Model) Cluster-Robust Standard Error: ", ols_fe_price_se, "\n")
+cat("IV (2SLS) Coefficient for price_per_serving: ", iv_price_coef, "\n")
+cat("IV (2SLS) Cluster-Robust Standard Error: ", iv_price_se, "\n")
+
+cat("OLS (FE Model) Coefficient for Intercept: ", ols_fe_intercept, "\n")
+cat("OLS (FE Model) Cluster-Robust Intercept Standard Error: ", ols_fe_intercept_se, "\n")
+cat("IV (2SLS) Coefficient for Intercept: ", iv_intercept, "\n")
+cat("IV (2SLS) Cluster-Robust Intercept Standard Error: ", iv_intercept_se, "\n")
+
+
+
+````
+
+6. Promotion analysis
+(a) With the estimates obtained above, compute the own-price elasticities of demand and associated
+price-cost margins. Discuss their credibility
+
+Note: Use ηjj = −αpj(1 − sj), as per slides.
+Next, your task is to simulate what would happen if we halved an important product’s price? To
+do so, select the most recent quarter in the first city: C01Q2.
+Create a new dataframe called counterfactual_data for just that market and inspect the data.
+We’ll pretend that we’re firm one, and deciding whether we want to cut the price of our brand
+fourth’s product F1B04.
+In your new dataframe with just data from C01Q2, create a new_prices column that is the same
+as prices but with the price of F1B04 cut in half.
+(b) Compute the percent change in sales of each product in the market. What can you say about
+the price elasticity of demand of the products?
+(c) From firm one’s perspective, do the estimates of product cannibalization make sense? That
+is, do the signs and magnitudes on the demand responses to the price change make sense?
+
+
+```{r}
+
+
+```
+
+
 
 First plots
 ```{r}
