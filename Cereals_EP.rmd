@@ -412,6 +412,22 @@ is, do the signs and magnitudes on the demand responses to the price change make
 
 ```{r}
 
+# First City Data C01Q2
+counterfactual_data <- cereal_data[cereal_data$market == "C01Q2", ]
+summary(counterfactual_data)
+
+# Halving price_per_serving for F1B04
+counterfactual_data$new_prices <- counterfactual_data$price_per_serving
+product_to_cut_price <- "F1B04"
+counterfactual_data$new_prices[counterfactual_data$product == product_to_cut_price] <-
+  counterfactual_data$new_prices[counterfactual_data$product == product_to_cut_price] / 2
+
+# Validate
+print(counterfactual_data[counterfactual_data$product == product_to_cut_price, c("product", "price_per_serving", "new_prices")])
+
+
+
+
 
 ```
 
