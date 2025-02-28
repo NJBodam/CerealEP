@@ -293,6 +293,8 @@ logit_model_firm_last3_fe <- lm(logit_delta ~ price_per_serving + mushy +  facto
 
 summary(logit_model_firm_last3_fe)
 
+head(cereal_data)
+
 ````
 
 5. Add an instrument for price
@@ -404,17 +406,38 @@ We’ll pretend that we’re firm one, and deciding whether we want to cut the p
 fourth’s product F1B04.
 In your new dataframe with just data from C01Q2, create a new_prices column that is the same
 as prices but with the price of F1B04 cut in half.
+
 (b) Compute the percent change in sales of each product in the market. What can you say about
 the price elasticity of demand of the products?
+
+Ans-
+Halving the price of F1B04 leads to a more than proportionate increase in its market share (223.64%) given its high price elasticity (-2.362803). 
+The substitution effect led to a uniform decrease in the market shares of competing products by 1.45% even though they all have varying own price elasticities.
+
 (c) From firm one’s perspective, do the estimates of product cannibalization make sense? That
 is, do the signs and magnitudes on the demand responses to the price change make sense?
+
+Ans-
+No. One would expect products closer in characteristic space to be closer substitutes and such be more impacted by the change in price of F1B04. But that is not the case here since our logit model is not a function of product characteristics. Substitution occurs uniformly across competing product market shares.
 
 
 ```{r}
 
 # First City Data C01Q2
 counterfactual_data <- cereal_data[cereal_data$market == "C01Q2", ]
+# counterfactual_data2 <- subset(cereal_data, market == "C01Q2")
+counterfactual_data <- counterfactual_data %>%
+  select(
+    product,     
+    mushy,       
+    price_per_serving,
+    market_share,
+    logit_delta
+  )
+
 summary(counterfactual_data)
+head(counterfactual_data)
+# summary(counterfactual_data2)
 
 # Halving price_per_serving for F1B04
 counterfactual_data$new_prices <- counterfactual_data$price_per_serving
@@ -425,9 +448,43 @@ counterfactual_data$new_prices[counterfactual_data$product == product_to_cut_pri
 # Validate
 print(counterfactual_data[counterfactual_data$product == product_to_cut_price, c("product", "price_per_serving", "new_prices")])
 
+# Extract α from the FE logit model (you can also replace with IV model) 
+# Needed to calculate change given η formula: η_jj = −αp_j(1 − s_j)
+alpha <- -coef(iv_model)["price_per_serving"]
+
+# Calculate the own-price elasticity for each product 
+counterfactual_data <- counterfactual_data %>%
+  mutate(own_price_elasticity = -alpha * price_per_serving * (1 - market_share))
+
+# Calculate the new logit_delta for F1B04
+counterfactual_data <- counterfactual_data %>%
+  mutate(logit_delta_new = ifelse(product == "F1B04", logit_delta - alpha * (new_prices - price_per_serving), logit_delta))
+
+# Calculate the new market shares
+total_logit <- sum(exp(counterfactual_data$logit_delta_new))
+counterfactual_data <- counterfactual_data %>%
+  mutate(new_market_share = exp(logit_delta_new) / (1 + total_logit))
+
+# Calculate the percent change in market shares
+counterfactual_data <- counterfactual_data %>%
+  mutate(percent_change_market_share = (new_market_share - market_share) / market_share * 100)
+
+# Inspect the final counterfactual data
+print(counterfactual_data %>% select(product, price_per_serving, new_prices, market_share, new_market_share, own_price_elasticity, percent_change_market_share))
+
+
+# Analyze the results
+cat("Own-Price Elasticity for F1B04:", counterfactual_data %>% filter(product == "F1B04") %>% pull(own_price_elasticity), "\n")
+cat("Percent Change in Market Share for F1B04:", counterfactual_data %>% filter(product == "F1B04") %>% pull(percent_change_market_share), "\n")
+
+
+```
 
 
 
+
+
+```{r}
 
 ```
 
