@@ -490,30 +490,7 @@ cat("Percent Change in Market Share for F1B04:", counterfactual_data %>% filter(
 
 
 
-First plots
 ```{r}
 
-# Filtering the data
-mushy <- data %>% filter(mushy == 1)
-firm <- data %>% filter(mushy == 0)
-
-# Base R plot: Consumption vs. Price (original)
-par(mfrow = c(1, 2))  # Arrange 2 plots side by side
-par(mgp = c(2, 1, 0)) 
-
-# Plot 1: Original plot
-plot(data$price_per_serving,data$servings_sold, xlab =  "Price per Serving",
-     ylab =  "Servings Sold", col = "blue", pch = 16)
-title("Consumption and Price of Cereals (Unaggregated)", line= 0.3)
-
-# Plot 2: Mushy vs Firm in the same plot using ggplot2
-ggplot(data, aes(x = price_per_serving, y = servings_sold, color = factor(mushy))) +
-  geom_point() +
-  labs(title = "Mushy vs Firm Cereals: Price vs Servings Sold",
-       x = "Price per Serving",
-       y = "Servings Sold",
-       color = "Cereal Type") +
-  scale_color_manual(values = c("blue", "red"), labels = c("Firm", "Mushy")) +
-  theme_minimal()
 
 ```
