@@ -41,6 +41,7 @@ data <- read.csv(file.path(getwd(), "products.csv"), sep = ",")
 
 print(head(data))
 
+
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
@@ -61,6 +62,62 @@ cereal_data$product <- as.factor(cereal_data$product)
 cereal_data$mushy <- as.factor(cereal_data$mushy)
 
 summary(cereal_data)
+
+
+y = log(cereal_data$servings_sold)
+
+ggplot(cereal_data, aes(x = price_per_serving, y = log(cereal_data$servings_sold))) +
+  geom_point() +  # Scatter points
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Regression line (linear model)
+  labs(title = "Scatter Plot with Regression Line",
+       subtitle = "Servings Sold vs. Price per Serving",
+       x = "Price per Serving",
+       y = "Log(Servings Sold)") +
+  theme_minimal()
+
+ggplot(cereal_data, aes(x = price_per_serving, y = y, color = factor(market_id))) +
+  geom_point() +  # Scatter points, color-coded by market id
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Regression line (overall, in red)
+  labs(title = "Scatter Plot with Regression Line",
+       subtitle = "Servings Sold (Log) vs. Price per Serving, Colored by Market ID",
+       x = "Price per Serving",
+       y = "Log(Servings Sold)",
+       color = "Market ID") + # Label for the color legend
+  theme_minimal() +
+  scale_color_discrete(name = "Market ID") 
+
+ggplot(cereal_data, aes(x = price_per_serving, y = y, color = factor(mkt_quar_id))) +
+  geom_point() +  # Scatter points, color-coded by quarter id
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Regression line (overall, in red)
+  labs(title = "Scatter Plot with Regression Line",
+       subtitle = "Servings Sold (Log) vs. Price per Serving, Colored by Quarter ID",
+       x = "Price per Serving",
+       y = "Log(Servings Sold)",
+       color = "Quarter ID") + # Label for the color legend
+  theme_minimal() +
+  scale_color_discrete(name = "Quarter ID") 
+
+ggplot(cereal_data, aes(x = price_per_serving, y = y, color = factor(firm_id))) +
+  geom_point() +  # Scatter points, color-coded by firm_id
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Regression line (overall, in red)
+  labs(title = "Scatter Plot with Regression Line",
+       subtitle = "Servings Sold (Log) vs. Price per Serving, Colored by Firm",
+       x = "Price per Serving",
+       y = "Log(Servings Sold)",
+       color = "Firm ID") + # Label for the color legend
+  theme_minimal() +
+  scale_color_discrete(name = "Firm ID")
+
+ggplot(cereal_data, aes(x = price_per_serving, y = y, color = factor(mushy))) +
+  geom_point() +  # Scatter points, color-coded by mushy
+  geom_smooth(method = "lm", se = FALSE, color = "red") + # Regression line (overall, in red)
+  labs(title = "Scatter Plot with Regression Line",
+       subtitle = "Servings Sold (Log) vs. Price per Serving, Colored by Mushy",
+       x = "Price per Serving",
+       y = "Log(Servings Sold)",
+       color = "Mushy") + # Label for the color legend
+  theme_minimal() +
+  scale_color_discrete(name = "Mushy")
 
 ```
 
@@ -116,6 +173,7 @@ logit_model <- lm(logit_delta ~  mushy + price_per_serving, data = cereal_data)
 summary(logit_model)
 ```
 (a) Interpret your estimates.
+Ans:
 Our model is in the form:
 - logit_delta = β₀ + β₁*mushy + β₂*price_per_serving + ε
 The intercept is negative (-2.93450 ) which shows that for non-mushy cereals with zero price, consumers will 
@@ -130,6 +188,7 @@ Only 3.42% (R-Squared) of the variation in logit_delta is explained by the model
 
 (b) How can you re-express your estimate on mushy in terms of how much consumers are willing
 to pay for mushy, using your estimated price coefficient?
+Ans:
 - WTP for mushy can be estimated by dividing the mushy coefficient by the price coefficient
 WTP_mushy =  0.07476 / 7.48014 = 0.01. 
 # Consumers are willing to pay $0.01 per serving for mushy cereal over non mushy cereal. But mushy not signiifcant
@@ -319,8 +378,6 @@ OLS (FE Model) Coefficient for price_per_serving:  -28.61787
 IV (2SLS) Coefficient for price_per_serving:  -30.59952
 
 The fact that the IV coefficient is more negative than the OLS coefficient suggests that the OLS estimate of the price effect might have been biased towards zero (less negative) due to endogeneity. This is indicative of positive endogeneity bias in the OLS model. IV estimation improved the estimate by reducing the bias, leading to a more negative and (hopefully) less biased estimate of the true price effect. IV shows demand for cereal is more elastic as shown in OLS.
-
-
 
 
 ```{r}
