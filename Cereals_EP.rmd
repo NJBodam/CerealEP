@@ -1,6 +1,6 @@
 ---
 title: "Cereal EP"
-author: "Alex Bystrov, Rocio Rodriguez, Bodam Jerry"
+author: "Alex Bystrov, Rocio Ramirez, Bodam Jerry"
 date: "2025-02-18"
 output: cereal_filtered_document
 ---
