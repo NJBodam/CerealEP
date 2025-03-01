@@ -14,9 +14,9 @@ library(haven)
 library(modelsummary)
 library(ggcorrplot)
 
-dataDir <- paste0(setwd('/Users/bystrov/Desktop/IO/EPs/final_ep'), "/data/products.csv")
-dataDir
-data <- read_csv(dataDir, col_names = TRUE)
+#dataDir <- paste0(setwd('/Users/bystrov/Desktop/IO/EPs/final_ep'), "/data/products.csv")
+#dataDir
+#data <- read_csv(dataDir, col_names = TRUE)
 
 print(head(data))
 spec(data)

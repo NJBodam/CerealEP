@@ -61,8 +61,16 @@ cereal_data$market <- as.factor(cereal_data$market)
 cereal_data$product <- as.factor(cereal_data$product)
 cereal_data$mushy <- as.factor(cereal_data$mushy)
 
-summary(cereal_data)
+cereal_data$market_id <- substr(cereal_data$market, 1, 3)
+cereal_data$market_id <- as.factor(cereal_data$market_id)
 
+cereal_data$firm_id <- substr(cereal_data$product, 1, 2)
+cereal_data$firm_id <- as.factor(cereal_data$firm_id)
+
+cereal_data$mkt_quar_id <- stringr::str_sub(cereal_data$market, start = -2) # Negative start index counts from the end
+cereal_data$mkt_quar_id <- as.factor(cereal_data$mkt_quar_id)
+
+summary(cereal_data)
 
 y = log(cereal_data$servings_sold)
 
@@ -338,14 +346,7 @@ print(mushy_summary)
 
 ```{r}
 
-cereal_data$firm_id <- substr(cereal_data$product, 1, 2)
-cereal_data$firm_id <- as.factor(cereal_data$firm_id)
 
-cereal_data$market_id <- substr(cereal_data$market, 1, 3)
-cereal_data$market_id <- as.factor(cereal_data$market_id)
-
-cereal_data$mkt_quar_id <- stringr::str_sub(cereal_data$market, start = -2) # Negative start index counts from the end
-cereal_data$mkt_quar_id <- as.factor(cereal_data$mkt_quar_id)
 
 
 logit_model_firm_last3_fe <- lm(logit_delta ~ price_per_serving + mushy +  factor(market) + factor(product)+ factor(mkt_quar_id) + factor(market_id) + factor(firm_id), data = cereal_data)
